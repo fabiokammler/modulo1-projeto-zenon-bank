@@ -8,8 +8,8 @@ public record CustomerInfo(String name,
 
     @Override
     public String toString() {
-        return  "name='" + name + "\r\n" +
-                ", oldBalance=" + oldBalance + "\r\n" +
-                ", newBalance=" + newBalance;
+        return  "CustomerInfo[name=" + name +
+                ", oldBalance=" + oldBalance +
+                ", newBalance=" + newBalance + "]";
     }
 }
