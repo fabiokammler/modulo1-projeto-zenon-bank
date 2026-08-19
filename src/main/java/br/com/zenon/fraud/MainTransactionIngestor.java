@@ -1,11 +1,10 @@
 package br.com.zenon.fraud;
 
-import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.List;
 
 public class MainTransactionIngestor {
-    void main() throws IOException {
+    void main() {
 
         TransactionIngestor transactionIngestor = new TransactionIngestor(Paths.get("data/PS_log.csv"));
         List<Transaction> transactionList = transactionIngestor.ingest();
