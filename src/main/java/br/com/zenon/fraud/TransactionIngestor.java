@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -17,7 +18,7 @@ public class TransactionIngestor {
 
     public TransactionIngestor(Path filePath) {
         this.filePath = filePath;
-        this.transactionList = new ArrayList<>();
+        this.transactionList = new ArrayList<Transaction>();
     }
 
     public List<Transaction> ingest() {
@@ -25,73 +26,48 @@ public class TransactionIngestor {
             transactionList.addAll(lines
                     .skip(1)
                     .limit(LIMIT)
-                    .map(converter()).toList());
+                    .map(converter())
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .toList());
         } catch (Exception e) {
             e.printStackTrace();
         }
         return transactionList;
     }
 
-    private Function<String, Transaction> converter() {
+    private Function<String, Optional<Transaction>> converter() {
         return (line) -> {
             List<String> lineContent = Arrays.stream(line.split(",\\s*")).toList();
+            Optional<Transaction> transaction;
 
-            Transaction transaction;
-            List<String> transactionTypes = Arrays.stream(TransactionType.values()).map(TransactionType::name).toList();
+            try {
+                String originName = lineContent.get(3).trim();
+                BigDecimal originOldBalance = new BigDecimal(lineContent.get(4).trim());
+                BigDecimal originNewBalance = new BigDecimal(lineContent.get(5).trim());
+                String recipientName = lineContent.get(6).trim();
+                BigDecimal recipientOldBalance = new BigDecimal(lineContent.get(7).trim());
+                BigDecimal recipientNewBalance = new BigDecimal(lineContent.get(8).trim());
+                boolean fraud = Boolean.parseBoolean(lineContent.get(9));
+                boolean flaggedFraud = Boolean.parseBoolean(lineContent.get(10));
 
-            TransactionType transactionType =  validateTransactionTypeAndGet(1, lineContent, transactionTypes);
-            String originName = lineContent.get(3).trim();
-            BigDecimal originOldBalance = validateMoneyAndGet(4, lineContent);
-            BigDecimal originNewBalance = validateMoneyAndGet(5, lineContent);
-            String recipientName = lineContent.get(6).trim();
-            BigDecimal recipientOldBalance = validateMoneyAndGet(7, lineContent);
-            BigDecimal recipientNewBalance = validateMoneyAndGet(8, lineContent);
-            boolean fraud = Boolean.parseBoolean(lineContent.get(9));
-            boolean flaggedFraud = Boolean.parseBoolean(lineContent.get(10));
-
-            transaction = new Transaction(
-                    validateIntAndGet(0, lineContent),
-                    transactionType,
-                    validateMoneyAndGet(2, lineContent),
-                    new CustomerInfo(originName, originOldBalance, originNewBalance),
-                    new CustomerInfo(recipientName, recipientOldBalance, recipientNewBalance),
-                    fraud,
-                    flaggedFraud
-            );
-
+                transaction = Optional.of(new Transaction(
+                        Integer.parseInt(lineContent.getFirst().trim()),
+                        TransactionType.valueOf(lineContent.get(1).trim()),
+                        new BigDecimal(lineContent.get(2).trim()),
+                        new CustomerInfo(originName, originOldBalance, originNewBalance),
+                        new CustomerInfo(recipientName, recipientOldBalance, recipientNewBalance),
+                        fraud,
+                        flaggedFraud
+                ));
+            } catch (Exception ex) {
+                System.err.printf("Erro: %s | %s: %s %n"
+                        , line
+                        , ex.getClass().getCanonicalName()
+                        , ex.getMessage());
+                return Optional.empty();
+            }
             return transaction;
         };
-    }
-
-    private BigDecimal validateMoneyAndGet(int index, List<String> lineContent) {
-        BigDecimal resultValue = BigDecimal.ZERO;
-
-        if(!lineContent.get(index).isEmpty()) {
-            resultValue = new BigDecimal(lineContent.get(index).trim());
-        }
-
-        return resultValue;
-    }
-
-    private int validateIntAndGet(int index, List<String> lineContent) {
-        int resultValue = 0;
-
-        if (!lineContent.get(index).isEmpty()) {
-            resultValue = Integer.parseInt(lineContent.get(index).trim());
-        }
-
-        return resultValue;
-    }
-
-    private TransactionType validateTransactionTypeAndGet(int index,
-                                                          List<String> lineContent,
-                                                          List<String> transactionTypes) {
-        TransactionType transactionType = null;
-
-        if (!lineContent.get(index).isEmpty() && transactionTypes.contains(lineContent.get(index))) {
-            transactionType = TransactionType.valueOf(lineContent.get(index).trim());
-        }
-
-        return transactionType;
     }
 }
