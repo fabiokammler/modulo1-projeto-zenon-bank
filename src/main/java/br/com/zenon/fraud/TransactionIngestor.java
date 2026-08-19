@@ -12,7 +12,7 @@ import java.util.stream.Stream;
 
 public class TransactionIngestor {
 
-    private static final int LIMIT=1000;
+    private static final int LIMIT=50000;
     private final List<Transaction> transactionList;
     private final Path filePath;
 
@@ -48,8 +48,8 @@ public class TransactionIngestor {
                 String recipientName = lineContent.get(6).trim();
                 BigDecimal recipientOldBalance = new BigDecimal(lineContent.get(7).trim());
                 BigDecimal recipientNewBalance = new BigDecimal(lineContent.get(8).trim());
-                boolean fraud = Boolean.parseBoolean(lineContent.get(9));
-                boolean flaggedFraud = Boolean.parseBoolean(lineContent.get(10));
+                boolean fraud = lineContent.get(9).equals("1") ? Boolean.TRUE : Boolean.FALSE;
+                boolean flaggedFraud = lineContent.get(10).equals("1") ? Boolean.TRUE : Boolean.FALSE;
 
                 transaction = Optional.of(new Transaction(
                         Integer.parseInt(lineContent.getFirst().trim()),
