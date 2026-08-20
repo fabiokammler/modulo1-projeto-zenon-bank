@@ -12,7 +12,7 @@ import java.util.stream.Stream;
 
 public class TransactionIngestor {
 
-    private static final int LIMIT=50000;
+    private static final int LIMIT=100000;
     private final List<Transaction> transactionList;
     private final Path filePath;
 
