@@ -16,9 +16,25 @@ public class TransactionIngestor {
     private final List<Transaction> transactionList;
     private final Path filePath;
 
+    private record ReportTransaction(BigDecimal amount, boolean isFraud) {
+
+    }
+
+    public record Statistics(long totalTransactions, long totalFraud, BigDecimal totalAmount) {
+
+        private final static Statistics ZERO = new Statistics(0, 0, BigDecimal.ZERO);
+
+        private Statistics addReportTransaction(ReportTransaction rt) {
+            return new Statistics(
+                    totalTransactions + 1,
+                    totalFraud + (rt.isFraud ? 1 : 0),
+                    totalAmount.add(rt.amount));
+        }
+    }
+
     public TransactionIngestor(Path filePath) {
         this.filePath = filePath;
-        this.transactionList = new ArrayList<Transaction>();
+        this.transactionList = new ArrayList<>();
     }
 
     public List<Transaction> ingest() {
@@ -34,6 +50,47 @@ public class TransactionIngestor {
             e.printStackTrace();
         }
         return transactionList;
+    }
+
+    public Statistics reduceIngest() {
+        try(Stream<String> lines = Files.lines(filePath)) {
+            return lines
+                    .skip(1)
+                    //.limit(LIMIT)
+                    .map(reduceConverter())
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .reduce(Statistics.ZERO,
+                            Statistics::addReportTransaction,
+                            (s1, s2) -> s1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private Function<String, Optional<ReportTransaction>> reduceConverter() {
+        return (line) -> {
+            List<String> lineContent = Arrays.stream(line.split(",\\s*")).toList();
+            Optional<ReportTransaction> transaction;
+
+            try {
+                boolean fraud = lineContent.get(9).equals("1") ? Boolean.TRUE : Boolean.FALSE;
+
+                transaction = Optional.of(new ReportTransaction(
+                        new BigDecimal(lineContent.get(2).trim()),
+                        fraud
+                ));
+            } catch (Exception ex) {
+                System.err.printf("Erro: %s | %s: %s %n"
+                        , line
+                        , ex.getClass().getCanonicalName()
+                        , ex.getMessage());
+                return Optional.empty();
+            }
+
+            return transaction;
+        };
     }
 
     private Function<String, Optional<Transaction>> converter() {
