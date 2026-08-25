@@ -16,7 +16,13 @@ public class TransactionMapRepository implements ITransactionRepository {
                 .collect(Collectors.toMap(transaction -> transaction.customerOrigInfo().name(), Function.identity()));
     }
 
-    public Optional<Transaction> retrieveTransactionsByNameOrig(String name) {
+    public Optional<Transaction> retrieveTransactionByOrigName(String name) {
        return Optional.ofNullable(transactionMap.get(name));
     }
+
+    @Override
+    public void save(Transaction transaction) {
+
+    }
+
 }

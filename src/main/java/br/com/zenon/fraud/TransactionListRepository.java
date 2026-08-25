@@ -11,10 +11,17 @@ public class TransactionListRepository implements ITransactionRepository {
         this.transactionList = transactionList;
     }
 
-    public Optional<Transaction> retrieveTransactionsByNameOrig(String name) {
+    public Optional<Transaction> retrieveTransactionByOrigName(String name) {
        return transactionList
                 .stream()
                 .filter(transaction -> transaction.customerOrigInfo().name().equals(name))
                 .findFirst();
     }
+
+    @Override
+    public void save(Transaction transaction) {
+
+    }
+
+
 }

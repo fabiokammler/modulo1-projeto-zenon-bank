@@ -4,5 +4,6 @@ import java.util.Optional;
 
 public interface ITransactionRepository {
 
-    Optional<Transaction> retrieveTransactionsByNameOrig(String name);
+    Optional<Transaction> retrieveTransactionByOrigName(String name);
+    void save(Transaction transaction);
 }

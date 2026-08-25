@@ -43,11 +43,11 @@ public class MainTransactionIngestor {
 
         ITransactionRepository transactionRepository = new TransactionListRepository(transactionList);
 
-        Optional<Transaction> naoExistente = transactionRepository.retrieveTransactionsByNameOrig("C12345");
+        Optional<Transaction> naoExistente = transactionRepository.retrieveTransactionByOrigName("C12345");
         naoExistente.ifPresentOrElse(IO::println, () -> IO.println("Transação não encontrada para o cliente %s".formatted("C12345")));
 
         long tempoInicial = System.nanoTime();
-        Optional<Transaction> existente = transactionRepository.retrieveTransactionsByNameOrig("C1868032458");
+        Optional<Transaction> existente = transactionRepository.retrieveTransactionByOrigName("C1868032458");
         existente.ifPresentOrElse(IO::println, () -> IO.println("Transação não encontrada para o cliente %s".formatted("C1231006815")));
         double tempoFinal = (double) (System.nanoTime() - tempoInicial) / 1_000_000.0;
 
@@ -56,7 +56,7 @@ public class MainTransactionIngestor {
         ITransactionRepository transactionMapRepository = new TransactionMapRepository(transactionList);
 
         long tempoInicial2 = System.nanoTime();
-        Optional<Transaction> existente2 = transactionMapRepository.retrieveTransactionsByNameOrig("C1868032458");
+        Optional<Transaction> existente2 = transactionMapRepository.retrieveTransactionByOrigName("C1868032458");
         existente2.ifPresentOrElse(IO::println, () -> IO.println("Transação não encontrada para o cliente %s".formatted("C1868032458")));
         double tempoFinal2 = (double) (System.nanoTime() - tempoInicial2) / 1_000_000.0;
 
