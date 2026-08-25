@@ -12,7 +12,7 @@ import java.util.stream.Stream;
 
 public class TransactionIngestor {
 
-    private static final int LIMIT=100000;
+    private static final int LIMIT=10_000;
     private final List<Transaction> transactionList;
     private final Path filePath;
 
@@ -56,7 +56,6 @@ public class TransactionIngestor {
         try(Stream<String> lines = Files.lines(filePath)) {
             return lines
                     .skip(1)
-                    //.limit(LIMIT)
                     .map(reduceConverter())
                     .filter(Optional::isPresent)
                     .map(Optional::get)
@@ -64,9 +63,8 @@ public class TransactionIngestor {
                             Statistics::addReportTransaction,
                             (s1, s2) -> s1);
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
-        return null;
     }
 
     private Function<String, Optional<ReportTransaction>> reduceConverter() {
