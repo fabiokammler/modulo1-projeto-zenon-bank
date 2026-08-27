@@ -1,19 +1,20 @@
 package br.com.zenon.fraud;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-public class TransactionIngestor {
+public class EfficientTransactionIngestor {
 
-    private static final int LIMIT=100;
-    private final List<Transaction> transactionList;
+    private static final int LIMIT=1_000_000;
     private final Path filePath;
 
     private record ReportTransaction(BigDecimal amount, boolean isFraud) {
@@ -32,69 +33,63 @@ public class TransactionIngestor {
         }
     }
 
-    public TransactionIngestor(Path filePath) {
+    public EfficientTransactionIngestor(Path filePath) {
         this.filePath = filePath;
-        this.transactionList = new ArrayList<>();
     }
 
-    public List<Transaction> ingest() {
-        try(Stream<String> lines = Files.lines(filePath)) {
-            transactionList.addAll(lines
-                    .skip(1)
-                    .limit(LIMIT)
-                    .map(converter())
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .toList());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return transactionList;
-    }
+    public void readAsBatch(int chunkSize, Consumer<List<Transaction>> listConsumer) {
+        try (ExecutorService executorService = Executors.newFixedThreadPool(10);
+             Stream<String> lines = Files.lines(filePath).skip(1);) {
 
-    public Statistics reduceIngest() {
-        try(Stream<String> lines = Files.lines(filePath)) {
-            return lines
-                    .skip(1)
-                    .map(reduceConverter())
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .reduce(Statistics.ZERO,
-                            Statistics::addReportTransaction,
-                            (s1, s2) -> s1);
-        } catch (Exception e) {
+            IO.println("Starting to process...");
+
+            var iterator = lines.iterator();
+            List<String> lineBatch = new ArrayList<>(chunkSize);
+            AtomicInteger index = new AtomicInteger(0);
+
+            while(iterator.hasNext()) {
+                String line = iterator.next();
+                lineBatch.add(line);
+
+                if(lineBatch.size() >= chunkSize) {
+                    IO.println("LOTE -> " + index.getAndIncrement());
+                    List<String> copyBatch = List.copyOf(lineBatch);
+                    executorService.submit(() -> executeReadFileBatch(copyBatch, listConsumer));
+                    lineBatch.clear();
+                }
+            }
+            if(!lineBatch.isEmpty()) {
+                executorService.submit(() -> executeReadFileBatch(lineBatch, listConsumer));
+            }
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Function<String, Optional<ReportTransaction>> reduceConverter() {
-        return (line) -> {
-            List<String> lineContent = Arrays.stream(line.split(",\\s*")).toList();
-            Optional<ReportTransaction> transaction;
-
-            try {
-                boolean fraud = lineContent.get(9).equals("1") ? Boolean.TRUE : Boolean.FALSE;
-
-                transaction = Optional.of(new ReportTransaction(
-                        new BigDecimal(lineContent.get(2).trim()),
-                        fraud
-                ));
-            } catch (Exception ex) {
-                System.err.printf("Erro: %s | %s: %s %n"
-                        , line
-                        , ex.getClass().getCanonicalName()
-                        , ex.getMessage());
-                return Optional.empty();
-            }
-
-            return transaction;
-        };
+    private void executeReadFileBatch(List<String> batch, Consumer<List<Transaction>> listConsumer) {
+        List<Transaction> list = batch.stream()
+                .parallel()
+                .map(converter())
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .toList();
+        listConsumer.accept(list);
     }
+
+    /*private void executeReadFileBatch(Stream<String> stream, int chunkSize, Consumer<List<Transaction>> listConsumer) {
+        AtomicInteger index = new AtomicInteger(0);
+        stream
+            .collect(Collectors.groupingBy(line -> index.getAndIncrement() / chunkSize))
+            .values()
+            .parallelStream()
+            .map(converter())
+            .forEach(listConsumer);
+    }*/
 
     private Function<String, Optional<Transaction>> converter() {
         return (line) -> {
+            Transaction transaction;
             List<String> lineContent = Arrays.stream(line.split(",\\s*")).toList();
-            Optional<Transaction> transaction;
 
             try {
                 String originName = lineContent.get(3).trim();
@@ -106,7 +101,7 @@ public class TransactionIngestor {
                 boolean fraud = lineContent.get(9).equals("1") ? Boolean.TRUE : Boolean.FALSE;
                 boolean flaggedFraud = lineContent.get(10).equals("1") ? Boolean.TRUE : Boolean.FALSE;
 
-                transaction = Optional.of(new Transaction(
+                transaction = new Transaction(
                         Integer.parseInt(lineContent.getFirst().trim()),
                         TransactionType.valueOf(lineContent.get(1).trim()),
                         new BigDecimal(lineContent.get(2).trim()),
@@ -114,7 +109,7 @@ public class TransactionIngestor {
                         new CustomerInfo(recipientName, recipientOldBalance, recipientNewBalance),
                         fraud,
                         flaggedFraud
-                ));
+                );
             } catch (Exception ex) {
                 System.err.printf("Erro: %s | %s: %s %n"
                         , line
@@ -122,7 +117,7 @@ public class TransactionIngestor {
                         , ex.getMessage());
                 return Optional.empty();
             }
-            return transaction;
+            return Optional.of(transaction);
         };
     }
 }

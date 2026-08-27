@@ -23,5 +23,9 @@ public class TransactionListRepository implements ITransactionRepository {
 
     }
 
+    //@Override
+    public void saveBatch(List<Transaction> transactionList) {
+
+    }
 
 }
