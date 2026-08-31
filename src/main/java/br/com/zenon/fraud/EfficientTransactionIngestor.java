@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 
 public class EfficientTransactionIngestor {
 
-    private static final int LIMIT=1_000_000;
+    private static final int LIMIT=50_000;
     private final Path filePath;
 
     private record ReportTransaction(BigDecimal amount, boolean isFraud) {
@@ -41,19 +41,18 @@ public class EfficientTransactionIngestor {
         try (ExecutorService executorService = Executors.newFixedThreadPool(10);
              Stream<String> lines = Files.lines(filePath).skip(1);) {
 
+            Spliterator<String> spliterator = lines.spliterator();
             IO.println("Starting to process...");
 
-            var iterator = lines.iterator();
             List<String> lineBatch = new ArrayList<>(chunkSize);
             AtomicInteger index = new AtomicInteger(0);
 
-            while(iterator.hasNext()) {
-                String line = iterator.next();
-                lineBatch.add(line);
+            while(spliterator.tryAdvance(lineBatch::add)) {
 
                 if(lineBatch.size() >= chunkSize) {
                     IO.println("LOTE -> " + index.getAndIncrement());
                     List<String> copyBatch = List.copyOf(lineBatch);
+
                     executorService.submit(() -> executeReadFileBatch(copyBatch, listConsumer));
                     lineBatch.clear();
                 }
@@ -67,13 +66,19 @@ public class EfficientTransactionIngestor {
     }
 
     private void executeReadFileBatch(List<String> batch, Consumer<List<Transaction>> listConsumer) {
+        long initialTime = System.nanoTime();
         List<Transaction> list = batch.stream()
                 .parallel()
                 .map(converter())
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .toList();
+        double finalTime = (System.nanoTime() - initialTime) / 1_000_000.0;
+        IO.println("Tempo para processar CPU: "+finalTime);
+        long initialTime2 = System.nanoTime();
         listConsumer.accept(list);
+        double finalTime2 = (System.nanoTime() - initialTime2) / 1_000_000.0;
+        IO.println("Tempo para processar I/O: "+finalTime2);
     }
 
     /*private void executeReadFileBatch(Stream<String> stream, int chunkSize, Consumer<List<Transaction>> listConsumer) {
