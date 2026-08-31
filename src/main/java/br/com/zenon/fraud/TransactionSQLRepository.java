@@ -2,10 +2,7 @@ package br.com.zenon.fraud;
 
 import java.math.BigDecimal;
 import java.sql.*;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Stream;
+import java.util.*;
 
 public class TransactionSQLRepository implements ITransactionRepository {
 
@@ -106,30 +103,23 @@ public class TransactionSQLRepository implements ITransactionRepository {
                 """;
 
                 try (PreparedStatement ps = conn.prepareStatement(sql);) {
-                    for (var transaction:transactionsList) {
-                        //IO.println("Adicionando transacao no lote...");
-                        //for(var transaction:transactionEntry.getValue()){
-                        ps.setInt(1, transaction.step());
-                        ps.setString(2, transaction.type().name());
-                        ps.setBigDecimal(3, transaction.amount());
-
-                        ps.setString(4, transaction.customerOrigInfo().name());
-                        ps.setBigDecimal(5, transaction.customerOrigInfo().oldBalance());
-                        ps.setBigDecimal(6, transaction.customerOrigInfo().newBalance());
-
-                        ps.setString(7, transaction.customerDestInfo().name());
-                        ps.setBigDecimal(8, transaction.customerDestInfo().oldBalance());
-                        ps.setBigDecimal(9, transaction.customerDestInfo().newBalance());
-
-                        ps.setBoolean(10, transaction.isFraud());
-                        ps.setBoolean(11, transaction.isFlaggedFraud());
-
-                        ps.setInt(1, transaction.step());
-                        ps.addBatch();
+                    Iterator<Transaction> iterator = transactionsList.iterator();
+                    List<Transaction> batchSize = new ArrayList<>(2_500);
+                    while(iterator.hasNext()) {
+                        batchSize.add(iterator.next());
+                        if(batchSize.size() >= 2_500) {
+                            parseTransactionToBatch(batchSize, ps);
+                            conn.commit();
+                            batchSize.clear();
+                            //ps.clearParameters();
+                        }
+                    }
+                    if(!batchSize.isEmpty()) {
+                        parseTransactionToBatch(batchSize, ps);
+                        conn.commit();
+                        batchSize.clear();
                         //ps.clearParameters();
                     }
-                    ps.executeBatch();
-                    conn.commit();
                 } catch (SQLException e) {
                     try {
                         conn.rollback();
@@ -142,5 +132,28 @@ public class TransactionSQLRepository implements ITransactionRepository {
                 throw new RuntimeException("Erro na conexao com o BD...", e);
             }
         }
+    }
+
+    private void parseTransactionToBatch(List<Transaction> batchSize, PreparedStatement ps) throws SQLException {
+        for(var transaction:batchSize) {
+            ps.setInt(1, transaction.step());
+            ps.setString(2, transaction.type().name());
+            ps.setBigDecimal(3, transaction.amount());
+
+            ps.setString(4, transaction.customerOrigInfo().name());
+            ps.setBigDecimal(5, transaction.customerOrigInfo().oldBalance());
+            ps.setBigDecimal(6, transaction.customerOrigInfo().newBalance());
+
+            ps.setString(7, transaction.customerDestInfo().name());
+            ps.setBigDecimal(8, transaction.customerDestInfo().oldBalance());
+            ps.setBigDecimal(9, transaction.customerDestInfo().newBalance());
+
+            ps.setBoolean(10, transaction.isFraud());
+            ps.setBoolean(11, transaction.isFlaggedFraud());
+
+            ps.setInt(1, transaction.step());
+            ps.addBatch();
+        }
+        ps.executeBatch();
     }
 }

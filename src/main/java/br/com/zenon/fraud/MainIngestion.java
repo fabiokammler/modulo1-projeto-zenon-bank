@@ -11,7 +11,7 @@ public class MainIngestion {
 
         long initialTime = System.nanoTime();
 
-        transactionIngestor.readAsBatch(10_000, transactionSQLRepository::saveMultiThreadBatch);
+        transactionIngestor.readAsBatch(5_500, transactionSQLRepository::saveMultiThreadBatch);
 
         double finalTime = (System.nanoTime() - initialTime) / 1_000_000.0;
         IO.println("Tempo para processar: "+finalTime);
